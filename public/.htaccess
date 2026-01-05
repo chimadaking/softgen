@@ -1,0 +1,12 @@
+# Enable Rewrite Engine
+RewriteEngine On
+
+# Set the base path - use relative path for subdirectory deployment
+RewriteBase /
+
+# If the request is for a real file or directory, skip rewriting
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Rewrite all other URLs to index.php?url=$1
+RewriteRule ^(.*)$ index.php?url=$1 [L,QSA]
