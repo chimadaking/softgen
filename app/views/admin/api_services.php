@@ -66,15 +66,98 @@
             <?php endif; ?>
         </div>
 
-        <a href="<?php echo site_url('api'); ?>" class="btn btn-secondary">
-            ← Back to API Instances
-        </a>
+        <div class="btn-group">
+            <a href="<?php echo site_url('api'); ?>" class="btn btn-secondary">
+                ← Back to API Instances
+            </a>
+            <?php if ($instance): ?>
+                <a href="<?php echo site_url('api/edit/' . $instance->id); ?>" class="btn btn-outline-info">
+                    <i class="bi bi-gear"></i> Settings
+                </a>
+                <a href="<?php echo site_url('api/syncServices/' . $instance->id); ?>" class="btn btn-outline-success" onclick="return confirm('Sync services from this API?');">
+                    <i class="bi bi-arrow-repeat"></i> Sync Services
+                </a>
+            <?php endif; ?>
+        </div>
     </div>
 
     <?php flash('success'); ?>
     <?php flash('error', '', 'alert alert-danger'); ?>
 
     <?php if ($instance): ?>
+        <!-- DEFAULT MARKUP SETTINGS PANEL -->
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-currency-dollar"></i> Default Markup Settings</h5>
+                <span class="badge bg-light text-dark">Current: $<?php echo number_format((float)($instance->default_markup ?? 0.00), 2); ?></span>
+            </div>
+            <div class="card-body">
+                <form method="post" action="<?php echo site_url('api/instanceSettings'); ?>" class="row g-3 align-items-end">
+                    <?php echo csrf_field(); ?>
+                    <input type="hidden" name="instance_id" value="<?php echo (int)$instance->id; ?>">
+
+                    <div class="col-md-4">
+                        <label for="default_markup" class="form-label">Default Markup ($)</label>
+                        <input type="number" name="default_markup" id="default_markup" class="form-control"
+                               value="<?php echo h($instance->default_markup ?? '0.00'); ?>"
+                               step="0.01" min="0" max="1000">
+                        <small class="form-text text-muted">
+                            Formula: final_price = api_rate + markup
+                        </small>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="form-check mt-4">
+                            <input type="checkbox" name="apply_to_all" id="apply_to_all" class="form-check-input" value="1">
+                            <label class="form-check-label" for="apply_to_all">
+                                Apply to ALL services immediately
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-save"></i> Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- BULK MARKUP APPLICATION -->
+        <div class="card mb-4 border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-layers"></i> Apply Markup to All Services</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="<?php echo site_url('api/applyBulkMarkup'); ?>" class="row g-3 align-items-end" id="bulkMarkupForm">
+                    <?php echo csrf_field(); ?>
+                    <input type="hidden" name="instance_id" value="<?php echo (int)$instance->id; ?>">
+
+                    <div class="col-md-4">
+                        <label for="bulk_markup_value" class="form-label">Markup Amount ($)</label>
+                        <input type="number" name="markup" id="bulk_markup_value" class="form-control"
+                               placeholder="0.00" step="0.01" min="0" max="1000" required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="form-check mt-4">
+                            <input type="checkbox" name="update_default" id="update_default" class="form-check-input" value="1">
+                            <label class="form-check-label" for="update_default">
+                                Also update instance default markup
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-success w-100" onclick="return confirm('Apply this markup to ALL services in this instance?');">
+                            <i class="bi bi-check-circle"></i> Apply to All Services
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- SEARCH + PER PAGE (auto-submit; Reset kept; Apply removed) -->
         <form method="get" action="<?php echo h(base_self()); ?>" class="row g-2 align-items-end mb-3" id="serviceFilterForm">
             <?php if (!empty($routerUrl)): ?>
@@ -196,6 +279,11 @@
                 </thead>
                 <tbody>
                 <?php foreach ($data['services'] as $s): ?>
+                    <?php 
+                        $apiRate = (float)$s->api_rate;
+                        $markup = (float)$s->markup;
+                        $finalPrice = (float)$s->final_price;
+                    ?>
                     <tr>
                         <td>
                             <input type="checkbox" class="form-check-input svc-check" value="<?php echo (int)$s->id; ?>">
@@ -208,23 +296,31 @@
                             </small>
                         </td>
                         <td><?php echo h($s->category); ?></td>
-                        <td>$<?php echo number_format((float)$s->api_rate, 4); ?></td>
+                        <td>$<?php echo number_format($apiRate, 4); ?></td>
 
                         <form method="post" action="<?php echo site_url('api/updateService'); ?>">
                             <input type="hidden" name="id" value="<?php echo (int)$s->id; ?>">
 
                             <td>
-                                <select name="markup" class="form-select form-select-sm">
-                                    <option value="0" <?php if ((float)$s->markup == 0) echo 'selected'; ?>>0%</option>
-                                    <option value="0.50" <?php if ((float)$s->markup == 0.50) echo 'selected'; ?>>50%</option>
-                                    <option value="1.00" <?php if ((float)$s->markup == 1.00) echo 'selected'; ?>>100%</option>
-                                    <option value="1.50" <?php if ((float)$s->markup == 1.50) echo 'selected'; ?>>150%</option>
-                                    <option value="2.00" <?php if ((float)$s->markup == 2.00) echo 'selected'; ?>>200%</option>
-                                </select>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" name="markup" class="form-control" 
+                                           value="<?php echo number_format($markup, 2); ?>" 
+                                           step="0.01" min="0" max="1000" style="width: 80px;">
+                                </div>
+                                <small class="text-muted">
+                                    <?php echo $apiRate > 0 ? '+' . round(($markup / $apiRate) * 100, 1) . '%' : ''; ?>
+                                </small>
                             </td>
 
                             <td>
-                                <strong>$<?php echo number_format((float)$s->final_price, 4); ?></strong>
+                                <div class="fw-bold text-success">
+                                    $<?php echo number_format($finalPrice, 4); ?>
+                                </div>
+                                <small class="text-muted">
+                                    <?php echo h($s->name); ?> =
+                                    $<?php echo number_format($apiRate, 2); ?> + $<?php echo number_format($markup, 2); ?>
+                                </small>
                             </td>
 
                             <td>

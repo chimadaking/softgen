@@ -30,6 +30,7 @@
                                 <th>Instance Name</th>
                                 <th>Provider</th>
                                 <th>Base URL</th>
+                                <th>Default Markup</th>
                                 <th>Status</th>
                                 <th>Created</th>
                                 <th>Actions</th>
@@ -49,6 +50,12 @@
                                     <code class="small">
                                         <?php echo h(substr($instance->base_url, 0, 40)); ?>…
                                     </code>
+                                </td>
+                                <td>
+                                    <?php $defaultMarkup = (float)($instance->default_markup ?? 0.00); ?>
+                                    <span class="badge bg-<?php echo $defaultMarkup > 0 ? 'success' : 'secondary'; ?>">
+                                        $<?php echo number_format($defaultMarkup, 2); ?>
+                                    </span>
                                 </td>
                                 <td>
                                     <span class="badge bg-<?php echo $instance->status === 'active' ? 'success' : 'secondary'; ?>">

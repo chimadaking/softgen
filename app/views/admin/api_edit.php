@@ -3,6 +3,8 @@
 <div class="container mt-4">
     <h1>Edit API Instance</h1>
 
+    <?php flash('error', '', 'alert alert-danger'); ?>
+
     <form method="post">
         <?php echo csrf_field(); ?>
 
@@ -31,6 +33,17 @@
                    placeholder="e.g., 0 or 168">
             <small class="form-text text-muted">
                 Used by providers whose pricing depends on country (e.g., SMS-Man). Leave blank if not applicable.
+            </small>
+        </div>
+
+        <div class="mb-3">
+            <label>Default Markup ($)</label>
+            <input type="number" name="default_markup" class="form-control"
+                   value="<?php echo h($data['instance']->default_markup ?? '0.00'); ?>"
+                   placeholder="0.00" step="0.01" min="0" max="1000">
+            <small class="form-text text-muted">
+                Default markup added to all service prices during sync.
+                <br><strong>Formula: final_price = api_rate + markup</strong>
             </small>
         </div>
 

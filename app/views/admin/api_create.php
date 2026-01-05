@@ -86,6 +86,18 @@
                             <?php endif; ?>
                         </div>
 
+                        <!-- Default Markup (Pricing) -->
+                        <div class="mb-3">
+                            <label for="default_markup" class="form-label">Default Markup ($)</label>
+                            <input type="number" name="default_markup" id="default_markup" class="form-control"
+                                   value="<?php echo h($data['default_markup'] ?? '0.00'); ?>"
+                                   placeholder="0.00" step="0.01" min="0" max="1000">
+                            <small class="form-text text-muted">
+                                Default markup added to all service prices during sync.
+                                <br><strong>Formula: final_price = api_rate + markup</strong>
+                            </small>
+                        </div>
+
                         <!-- Status Toggle -->
                         <div class="mb-3 form-check">
                             <input type="checkbox" name="status" id="status" class="form-check-input"
