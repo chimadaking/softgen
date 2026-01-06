@@ -72,6 +72,20 @@
                             <?php endif; ?>
                         </div>
 
+                        <!-- Default Markup -->
+                        <div class="mb-3">
+                            <label for="default_markup" class="form-label">Default Markup (optional)</label>
+                            <input type="number" step="0.01" min="0" max="1000" name="default_markup" id="default_markup" class="form-control"
+                                   value="<?php echo h($data['default_markup'] ?? '0.00'); ?>"
+                                   placeholder="0.00">
+                            <small class="form-text text-muted">
+                                Fractional markup applied during sync (e.g., 0.50 = 50%, 1.00 = 100%). Formula: final_price = api_rate × (1 + markup)
+                            </small>
+                            <?php if (!empty($data['default_markup_err'])): ?>
+                                <div class="text-danger small"><?php echo $data['default_markup_err']; ?></div>
+                            <?php endif; ?>
+                        </div>
+
                         <!-- Default Country (Admin controls pricing base) -->
                         <div class="mb-3">
                             <label for="default_country" class="form-label">Default Country (optional)</label>
