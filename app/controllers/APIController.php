@@ -48,6 +48,7 @@ class APIController extends BaseController
                 'name'        => trim($_POST['name'] ?? ''),
                 'base_url'    => trim($_POST['base_url'] ?? ''),
                 'api_key'     => trim($_POST['api_key'] ?? ''),
+                'default_markup' => (float)($_POST['default_markup'] ?? 0.00),
                 'default_country' => trim($_POST['default_country'] ?? ''),
                 'status'      => ($_POST['status'] ?? 'active') === 'active' ? 'active' : 'inactive'
             ];
@@ -93,6 +94,7 @@ class APIController extends BaseController
                 'name'        => trim($_POST['name'] ?? ''),
                 'base_url'    => trim($_POST['base_url'] ?? ''),
                 'api_key'     => trim($_POST['api_key'] ?? ''),
+                'default_markup' => (float)($_POST['default_markup'] ?? 0.00),
                 'default_country' => trim($_POST['default_country'] ?? ''),
                 'status'      => ($_POST['status'] ?? 'active') === 'active' ? 'active' : 'inactive'
             ];
@@ -278,10 +280,23 @@ class APIController extends BaseController
             }
         }
 
-        if ($pricingUpdated > 0) {
-            flash('success', "Service sync completed. {$synced} services processed. Pricing updated for {$pricingUpdated} services.");
+        /* -------------------------
+           3) APPLY DEFAULT MARKUP
+        --------------------------*/
+        $defaultMarkup = (float)($instance->default_markup ?? 0.00);
+        if ($defaultMarkup > 0.0) {
+            $markupApplied = $this->instanceModel->applyDefaultMarkupToServices($instanceId);
+            if ($pricingUpdated > 0) {
+                flash('success', "Service sync completed. {$synced} services processed. Pricing updated for {$pricingUpdated} services. Default markup ({$defaultMarkup}) applied to {$markupApplied} services.");
+            } else {
+                flash('success', "Service sync completed. {$synced} services processed. Default markup ({$defaultMarkup}) applied to {$markupApplied} services.");
+            }
         } else {
-            flash('success', "Service sync completed. {$synced} services processed.");
+            if ($pricingUpdated > 0) {
+                flash('success', "Service sync completed. {$synced} services processed. Pricing updated for {$pricingUpdated} services.");
+            } else {
+                flash('success', "Service sync completed. {$synced} services processed.");
+            }
         }
 
         redirect('api');
@@ -493,6 +508,104 @@ class APIController extends BaseController
         }
 
         redirect($path);
+    }
+
+    /**
+     * Apply bulk markup to ALL services in an instance
+     */
+    public function applyBulkMarkup()
+    {
+        $this->requireAdmin();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['status' => 'error', 'message' => 'Invalid request method']);
+            return;
+        }
+
+        $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+        // CSRF protection
+        if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
+        $instanceId = (int)($_POST['instance_id'] ?? 0);
+        $markup = (float)($_POST['markup_percentage'] ?? 0);
+
+        if ($instanceId <= 0) {
+            echo json_encode(['status' => 'error', 'message' => 'Invalid instance ID']);
+            return;
+        }
+
+        $count = $this->serviceModel->bulkUpdateMarkup($instanceId, $markup);
+
+        echo json_encode([
+            'status' => 'success',
+            'updated_count' => $count,
+            'message' => "Updated {$count} services with markup {$markup}"
+        ]);
+    }
+
+    /**
+     * Instance settings - manage default_markup
+     */
+    public function instanceSettings($id = null)
+    {
+        $this->requireAdmin();
+
+        $instanceId = (int)$id;
+        if ($instanceId <= 0) {
+            flash('error', 'Invalid instance ID', 'alert alert-danger');
+            redirect('api');
+        }
+
+        $instance = $this->instanceModel->getInstanceById($instanceId);
+        if (!$instance) {
+            flash('error', 'API instance not found', 'alert alert-danger');
+            redirect('api');
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+            // CSRF protection
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('api/instanceSettings/' . $instanceId);
+            }
+
+            $action = trim($_POST['action'] ?? '');
+            $defaultMarkup = (float)($_POST['default_markup'] ?? 0);
+
+            switch ($action) {
+                case 'update_default':
+                    $this->instanceModel->setDefaultMarkup($instanceId, $defaultMarkup);
+                    flash('success', 'Default markup updated successfully');
+                    break;
+
+                case 'apply_to_all':
+                    $count = $this->instanceModel->applyDefaultMarkupToServices($instanceId);
+                    flash('success', "Applied default markup to {$count} services");
+                    break;
+
+                case 'clear_markup':
+                    $count = $this->serviceModel->bulkUpdateMarkup($instanceId, 0.00);
+                    flash('success', "Cleared markup for {$count} services");
+                    break;
+
+                default:
+                    flash('error', 'Invalid action', 'alert alert-danger');
+            }
+
+            redirect('api/instanceSettings/' . $instanceId);
+        }
+
+        // GET request - show form
+        $this->view('admin/api_instance_settings', [
+            'title' => 'Instance Settings - ' . h($instance->name),
+            'instance' => $instance
+        ]);
     }
 
     /* =========================

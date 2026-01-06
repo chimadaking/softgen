@@ -65,6 +65,10 @@
                                         Manage Services
                                     </a>
 
+                                    <a href="<?php echo site_url('api/instanceSettings/' . $instance->id); ?>" class="btn btn-sm btn-outline-warning">
+                                        <i class="bi bi-sliders"></i> Settings
+                                    </a>
+
                                     <a href="<?php echo site_url('api/syncServices/' . $instance->id); ?>" class="btn btn-sm btn-outline-success" onclick="return confirm('Sync services from this API?');">
                                         Sync Services
                                     </a>

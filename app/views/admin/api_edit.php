@@ -25,6 +25,16 @@
         </div>
 
         <div class="mb-3">
+            <label>Default Markup</label>
+            <input type="number" step="0.01" min="0" max="1000" name="default_markup" class="form-control"
+                   value="<?php echo number_format((float)($data['instance']->default_markup ?? 0.00), 2, '.', ''); ?>"
+                   placeholder="0.00">
+            <small class="form-text text-muted">
+                Fractional markup applied during sync (e.g., 0.50 = 50%, 1.00 = 100%). Formula: final_price = api_rate × (1 + markup)
+            </small>
+        </div>
+
+        <div class="mb-3">
             <label>Default Country (optional)</label>
             <input type="text" name="default_country" class="form-control"
                    value="<?php echo h($data['instance']->default_country ?? ''); ?>"
