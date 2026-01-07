@@ -13,12 +13,22 @@ return [
     // User Dashboard
     'dashboard' => ['DashboardController', 'index'],
 
+    // Loyalty Program
+    'loyalty' => ['LoyaltyController', 'index'],
+    'loyalty/redeem' => ['LoyaltyController', 'redeem'],
+    '/api/loyalty/stats' => ['LoyaltyController', 'getStats'],
+
     // Admin Dashboard
     'admin' => ['AdminController', 'index'],
 
     // Admin Auth (optional explicit routes)
     'admin/login' => ['AdminController', 'login'],
     'admin/register' => ['AdminController', 'register'],
+
+    // Loyalty Management (admin)
+    'admin/loyalty' => ['AdminController', 'loyalty'],
+    'admin/loyalty/{id}' => ['AdminController', 'loyaltyDetail'],
+    'admin/loyalty/settings' => ['AdminController', 'loyaltySettings'],
 
     // Roles / Users (admin)
     'admin/users' => ['UserController', 'index'],

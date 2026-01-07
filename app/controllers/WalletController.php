@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 class WalletController extends BaseController {
     private $walletModel;
+    private $loyaltyModel;
     private $userData;
 
     public function __construct() {
@@ -11,6 +12,7 @@ class WalletController extends BaseController {
         }
         $this->userData = getUser();
         $this->walletModel = $this->model('Wallet');
+        $this->loyaltyModel = $this->model('Loyalty');
     }
 
     public function index() {
@@ -46,7 +48,17 @@ class WalletController extends BaseController {
                 // For this demo, we'll simulate a successful payment
                 $this->walletModel->updateBalance($this->userData['id'], $amount, 'credit');
                 $this->walletModel->addTransaction($this->userData['id'], $amount, 'deposit', 'Wallet funding via ' . ucfirst($data['method']));
-                $data['success'] = 'Wallet funded successfully!';
+                
+                // Award loyalty points for wallet funding
+                $pointsRate = $this->loyaltyModel->getPointsRate('funding');
+                $pointsEarned = $amount * $pointsRate;
+                
+                if ($pointsEarned > 0) {
+                    $this->loyaltyModel->addPoints($this->userData['id'], $pointsEarned, "Wallet funding - $" . number_format($amount, 2));
+                    $this->loyaltyModel->updateTier($this->userData['id']);
+                }
+                
+                $data['success'] = 'Wallet funded successfully! You earned ' . number_format($pointsEarned, 2) . ' loyalty points.';
                 redirect('wallet');
             }
         } else {
