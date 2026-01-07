@@ -39,8 +39,13 @@ class DashboardController extends BaseController {
             return;
         }
         $user = $this->userModel->findById($userData['id']);
+        $roles = $this->userModel->getUserRoles($userData['id']);
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('dashboard/profile');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $data = [
@@ -51,7 +56,8 @@ class DashboardController extends BaseController {
                 'last_name_err' => '',
                 'current_password_err' => '',
                 'new_password_err' => '',
-                'confirm_password_err' => ''
+                'confirm_password_err' => '',
+                'roles' => $roles
             ];
 
             if (empty($data['first_name_err']) && empty($data['last_name_err'])) {
@@ -72,7 +78,8 @@ class DashboardController extends BaseController {
                 'last_name_err' => '',
                 'current_password_err' => '',
                 'new_password_err' => '',
-                'confirm_password_err' => ''
+                'confirm_password_err' => '',
+                'roles' => $roles
             ];
         }
 
@@ -87,8 +94,13 @@ class DashboardController extends BaseController {
             return;
         }
         $user = $this->userModel->findById($userData['id']);
+        $roles = $this->userModel->getUserRoles($userData['id']);
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('dashboard/password');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $data = [
@@ -98,7 +110,8 @@ class DashboardController extends BaseController {
                 'confirm_password' => trim($_POST['confirm_password']),
                 'current_password_err' => '',
                 'new_password_err' => '',
-                'confirm_password_err' => ''
+                'confirm_password_err' => '',
+                'roles' => $roles
             ];
 
             if (empty($data['current_password'])) {
@@ -125,6 +138,7 @@ class DashboardController extends BaseController {
         }
 
         $data['title'] = 'My Profile';
+        $data['roles'] = $data['roles'] ?? $roles;
         $this->view('dashboard/profile', $data);
     }
 }

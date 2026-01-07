@@ -183,28 +183,6 @@ class APIInstance extends BaseModel
        MARKUP MANAGEMENT
     ========================= */
 
-    public function getDefaultMarkup(int $id): float
-    {
-        $row = $this->fetch(
-            "SELECT default_markup FROM api_instances WHERE id = ?",
-            [$id]
-        );
-        return (float)($row->default_markup ?? 0.00);
-    }
-
-    public function setDefaultMarkup(int $id, float $markup): bool
-    {
-        $markup = max(0.0, min(1000.00, $markup));
-        $markup = round($markup, 2);
-
-        $this->query(
-            "UPDATE api_instances SET default_markup = ?, updated_at = NOW() WHERE id = ?",
-            [$markup, $id]
-        );
-
-        return true;
-    }
-
     public function applyDefaultMarkupToServices(int $id): int
     {
         $instance = $this->getInstanceById($id);

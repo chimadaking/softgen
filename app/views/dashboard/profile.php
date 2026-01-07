@@ -79,7 +79,21 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <strong>Role:</strong> <span class="badge bg-primary"><?php echo ucfirst($data['user']->role); ?></span>
+                    <strong>Roles:</strong>
+                    <?php
+                        $roleNames = [];
+                        if (!empty($data['roles'])) {
+                            foreach ($data['roles'] as $role) {
+                                $roleNames[] = $role->name;
+                            }
+                        }
+                        if (empty($roleNames)) {
+                            $roleNames = ['user'];
+                        }
+                    ?>
+                    <?php foreach ($roleNames as $roleName): ?>
+                        <span class="badge bg-primary"><?php echo h(ucfirst($roleName)); ?></span>
+                    <?php endforeach; ?>
                 </div>
                 <div class="mb-3">
                     <strong>Status:</strong> <span class="badge bg-<?php echo ($data['user']->status == 'active') ? 'success' : 'warning'; ?>"><?php echo ucfirst($data['user']->status); ?></span>
