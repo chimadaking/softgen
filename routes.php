@@ -46,6 +46,8 @@ return [
     'api/updateService' => ['APIController', 'updateService'],
     'api/bulkUpdateServices' => ['APIController', 'bulkUpdateServices'],
     'api/syncServices/{id}' => ['APIController', 'syncServices'],
+    'api/applyBulkMarkup' => ['APIController', 'applyBulkMarkup'],
+    'api/instanceSettings/{id}' => ['APIController', 'instanceSettings'],
 
     // Markup Management
     'api/applyBulkMarkup' => ['APIController', 'applyBulkMarkup'],

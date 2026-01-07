@@ -279,6 +279,47 @@ class APIService extends BaseModel
     }
 
     /**
+     * Update ONLY markup for a single service and recalculate final_price
+     */
+    public function updateMarkup(int $id, float $markup): bool
+    {
+        $markup = $this->normalizeDecimal($markup, 0.0, 1000.00);
+        $markup = round($markup, 2);
+
+        $sql = "
+            UPDATE api_services
+            SET
+                markup = ?,
+                final_price = ROUND(api_rate * (1 + ?), 4),
+                updated_at = NOW()
+            WHERE id = ?
+        ";
+
+        $this->query($sql, [$markup, $markup, $id]);
+        return true;
+    }
+
+    /**
+     * Update markup for ALL services in an instance
+     */
+    public function bulkUpdateMarkup(int $instanceId, float $markup): int
+    {
+        $markup = $this->normalizeDecimal($markup, 0.0, 1000.00);
+        $markup = round($markup, 2);
+
+        $stmt = $this->query(
+            "UPDATE api_services
+             SET markup = ?,
+                 final_price = ROUND(api_rate * (1 + ?), 4),
+                 updated_at = NOW()
+             WHERE api_instance_id = ?",
+            [$markup, $markup, $instanceId]
+        );
+
+        return (int)$stmt->rowCount();
+    }
+
+    /**
      * Bulk update selected services for a given instance.
      *
      * Supported bulk operations:

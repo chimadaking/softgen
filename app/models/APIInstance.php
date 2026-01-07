@@ -111,6 +111,7 @@ class APIInstance extends BaseModel
 
         $sql = "INSERT INTO api_instances
                 (provider_id, name, base_url, api_key, default_country, default_markup, status, created_at)
+                (provider_id, name, base_url, api_key, default_markup, default_country, status, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
 
         return $this->query($sql, [
@@ -118,6 +119,7 @@ class APIInstance extends BaseModel
             $data['name'],
             rtrim($data['base_url'], '/'),
             $data['api_key'],
+            (float)($data['default_markup'] ?? 0.00),
             $data['default_country'] ?? null,
             $defaultMarkup,
             $data['status'] ?? 'active'
@@ -136,6 +138,7 @@ class APIInstance extends BaseModel
                     name             = ?,
                     base_url         = ?,
                     api_key          = ?,
+                    default_markup   = ?,
                     default_country  = ?,
                     default_markup   = ?,
                     status           = ?,
@@ -147,6 +150,7 @@ class APIInstance extends BaseModel
             $data['name'],
             rtrim($data['base_url'], '/'),
             $data['api_key'],
+            (float)($data['default_markup'] ?? 0.00),
             $data['default_country'] ?? null,
             $defaultMarkup,
             $data['status'] ?? 'active',
@@ -173,6 +177,53 @@ class APIInstance extends BaseModel
             "DELETE FROM api_instances WHERE id = ?",
             [$id]
         );
+    }
+
+    /* =========================
+       MARKUP MANAGEMENT
+    ========================= */
+
+    public function getDefaultMarkup(int $id): float
+    {
+        $row = $this->fetch(
+            "SELECT default_markup FROM api_instances WHERE id = ?",
+            [$id]
+        );
+        return (float)($row->default_markup ?? 0.00);
+    }
+
+    public function setDefaultMarkup(int $id, float $markup): bool
+    {
+        $markup = max(0.0, min(1000.00, $markup));
+        $markup = round($markup, 2);
+
+        $this->query(
+            "UPDATE api_instances SET default_markup = ?, updated_at = NOW() WHERE id = ?",
+            [$markup, $id]
+        );
+
+        return true;
+    }
+
+    public function applyDefaultMarkupToServices(int $id): int
+    {
+        $instance = $this->getInstanceById($id);
+        if (!$instance) {
+            return 0;
+        }
+
+        $markup = (float)($instance->default_markup ?? 0.00);
+
+        $stmt = $this->query(
+            "UPDATE api_services
+             SET markup = ?,
+                 final_price = ROUND(api_rate * (1 + ?), 4),
+                 updated_at = NOW()
+             WHERE api_instance_id = ?",
+            [$markup, $markup, $id]
+        );
+
+        return (int)$stmt->rowCount();
     }
 
     /* =========================
