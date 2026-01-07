@@ -49,4 +49,8 @@ return [
     'api/applyBulkMarkup' => ['APIController', 'applyBulkMarkup'],
     'api/instanceSettings/{id}' => ['APIController', 'instanceSettings'],
 
+    // Markup Management
+    'api/applyBulkMarkup' => ['APIController', 'applyBulkMarkup'],
+    'api/instanceSettings' => ['APIController', 'instanceSettings'],
+
 ];

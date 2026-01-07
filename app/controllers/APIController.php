@@ -50,6 +50,7 @@ class APIController extends BaseController
                 'api_key'     => trim($_POST['api_key'] ?? ''),
                 'default_markup' => (float)($_POST['default_markup'] ?? 0.00),
                 'default_country' => trim($_POST['default_country'] ?? ''),
+                'default_markup' => (float)($_POST['default_markup'] ?? 0.00),
                 'status'      => ($_POST['status'] ?? 'active') === 'active' ? 'active' : 'inactive'
             ];
 
@@ -96,6 +97,7 @@ class APIController extends BaseController
                 'api_key'     => trim($_POST['api_key'] ?? ''),
                 'default_markup' => (float)($_POST['default_markup'] ?? 0.00),
                 'default_country' => trim($_POST['default_country'] ?? ''),
+                'default_markup' => (float)($_POST['default_markup'] ?? 0.00),
                 'status'      => ($_POST['status'] ?? 'active') === 'active' ? 'active' : 'inactive'
             ];
 
@@ -179,6 +181,9 @@ class APIController extends BaseController
             redirect('api');
         }
 
+        // Get instance default markup for pricing calculation
+        $defaultMarkup = (float)($instance->default_markup ?? 0.00);
+
         $synced = 0;
         foreach ($svcList as $key => $raw) {
             if (!is_array($raw)) continue;
@@ -208,6 +213,7 @@ class APIController extends BaseController
                 $rate = (float)$raw[$svcMap['price']];
             }
 
+            // Apply instance default markup during sync
             $this->serviceModel->upsertService([
                 'api_instance_id'     => $instanceId,
                 'external_service_id' => $externalId,
@@ -215,7 +221,8 @@ class APIController extends BaseController
                 'category'            => (string)$category,
                 'type'                => (string)$type,
                 'api_rate'            => $rate,
-                'final_price'         => $rate,
+                'markup'              => $defaultMarkup,
+                'final_price'         => $rate + $defaultMarkup,
                 'min_qty'             => $min,
                 'max_qty'             => $max,
                 'extra'               => $raw
@@ -281,6 +288,20 @@ class APIController extends BaseController
         }
 
         /* -------------------------
+           3) APPLY DEFAULT MARKUP TO ALL SERVICES
+        --------------------------*/
+        $markupApplied = 0;
+        if ($defaultMarkup > 0) {
+            $markupApplied = $this->serviceModel->applyDefaultMarkup($instanceId, $defaultMarkup);
+        }
+
+        // Build success message
+        $messages = ["Service sync completed. {$synced} services processed."];
+        if ($pricingUpdated > 0) {
+            $messages[] = "Pricing updated for {$pricingUpdated} services.";
+        }
+        if ($markupApplied > 0) {
+            $messages[] = "Default markup (${$defaultMarkup}) applied to {$markupApplied} services.";
            3) APPLY DEFAULT MARKUP
         --------------------------*/
         $defaultMarkup = (float)($instance->default_markup ?? 0.00);
@@ -298,6 +319,8 @@ class APIController extends BaseController
                 flash('success', "Service sync completed. {$synced} services processed.");
             }
         }
+
+        flash('success', implode(' ', $messages));
 
         redirect('api');
     }
@@ -511,6 +534,105 @@ class APIController extends BaseController
     }
 
     /**
+     * Apply bulk markup to ALL services of an API instance.
+     * POST /api/applyBulkMarkup
+     *
+     * @param int|null $instanceId (optional, for direct URL access)
+     */
+    public function applyBulkMarkup($instanceId = null)
+    {
+        $this->requireAdmin();
+
+        // Get instance_id from POST body or route parameter
+        $instanceId = (int)($instanceId ?? ($_POST['instance_id'] ?? 0));
+
+        if ($instanceId <= 0) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'API instance ID is required.']);
+            return;
+        }
+
+        // Get the instance
+        $instance = $this->instanceModel->getInstanceById($instanceId);
+        if (!$instance) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'API instance not found.']);
+            return;
+        }
+
+        // Validate input
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+        $isJson = stripos($contentType, 'application/json') !== false;
+
+        $markup = 0.00;
+
+        if ($isJson) {
+            // JSON payload
+            $rawBody = file_get_contents('php://input');
+            $payload = json_decode($rawBody ?: '{}', true);
+            $markup = (float)($payload['markup'] ?? 0.00);
+        } else {
+            // Form payload
+            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+            $markup = (float)($_POST['markup'] ?? 0.00);
+        }
+
+        // Validate markup range
+        if ($markup < 0) {
+            $markup = 0.00;
+        }
+        if ($markup > 1000.00) {
+            $markup = 1000.00;
+        }
+
+        // Apply bulk markup
+        $updatedCount = $this->serviceModel->bulkUpdateMarkup($instanceId, $markup);
+
+        // Update instance default markup if requested
+        $updateDefault = (bool)($_POST['update_default'] ?? ($payload['update_default'] ?? false));
+        if ($updateDefault) {
+            $this->instanceModel->setDefaultMarkup($instanceId, $markup);
+        }
+
+        // Return JSON response
+        if ($isJson) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => true,
+                'message' => "Markup applied to {$updatedCount} services.",
+                'data' => [
+                    'instance_id' => $instanceId,
+                    'markup' => round($markup, 2),
+                    'updated_count' => $updatedCount,
+                    'updated_default' => $updateDefault
+                ]
+            ]);
+            return;
+        }
+
+        // HTML response
+        flash('success', "Bulk markup applied to {$updatedCount} services.");
+        redirect('api/services/' . $instanceId);
+    }
+
+    /**
+     * Save instance settings including default markup.
+     * POST /api/instanceSettings
+     */
+    public function instanceSettings()
+    {
+        $this->requireAdmin();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            redirect('api');
+        }
+
+        $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+        $instanceId = (int)($_POST['instance_id'] ?? 0);
+
+        if ($instanceId <= 0) {
+            flash('error', 'Invalid API instance.', 'alert alert-danger');
      * Apply bulk markup to ALL services in an instance
      */
     public function applyBulkMarkup()
@@ -562,6 +684,28 @@ class APIController extends BaseController
 
         $instance = $this->instanceModel->getInstanceById($instanceId);
         if (!$instance) {
+            flash('error', 'API instance not found.', 'alert alert-danger');
+            redirect('api');
+        }
+
+        // Update default markup
+        $defaultMarkup = (float)($_POST['default_markup'] ?? 0.00);
+        if ($defaultMarkup < 0) $defaultMarkup = 0.00;
+        if ($defaultMarkup > 1000.00) $defaultMarkup = 1000.00;
+
+        // Apply to all services if requested
+        $applyToAll = isset($_POST['apply_to_all']);
+
+        $this->instanceModel->setDefaultMarkup($instanceId, $defaultMarkup);
+
+        if ($applyToAll) {
+            $updatedCount = $this->serviceModel->applyDefaultMarkup($instanceId, $defaultMarkup);
+            flash('success', "Default markup set to {$defaultMarkup}. Applied to {$updatedCount} services.");
+        } else {
+            flash('success', "Default markup updated to {$defaultMarkup}.");
+        }
+
+        redirect('api/services/' . $instanceId);
             flash('error', 'API instance not found', 'alert alert-danger');
             redirect('api');
         }

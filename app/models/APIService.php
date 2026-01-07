@@ -150,14 +150,20 @@ class APIService extends BaseModel
     /**
      * Insert or update a service safely (UPSERT)
      *
-     * - Preserves admin-controlled fields
+     * - Preserves admin-controlled fields (markup, status, visible)
      * - Updates API-controlled fields
      * - Never auto-enables or auto-exposes services
+     * - Pricing formula: final_price = api_rate + markup (NOT api_rate * markup)
      */
     public function upsertService(array $data): bool
     {
-        $apiRate    = $this->normalizeDecimal($data['api_rate'] ?? 0, 0.0, 999999.9999);
-        $finalPrice = $this->normalizeDecimal($data['final_price'] ?? $apiRate, 0.0, 999999.9999);
+        $apiRate = $this->normalizeDecimal($data['api_rate'] ?? 0, 0.0, 999999.9999);
+        
+        // Calculate markup if provided, otherwise use 0
+        $markup = $this->normalizeDecimal($data['markup'] ?? 0, 0.0, 1000.00);
+        
+        // Final price = api_rate + markup (simple addition per requirements)
+        $finalPrice = $this->normalizeDecimal($data['final_price'] ?? ($apiRate + $markup), 0.0, 999999.9999);
 
         $minQty = $this->normalizeInt($data['min_qty'] ?? 1, 0);
         $maxQty = $this->normalizeInt($data['max_qty'] ?? 100000, 0);
@@ -174,6 +180,7 @@ class APIService extends BaseModel
                 category,
                 type,
                 api_rate,
+                markup,
                 final_price,
                 min_qty,
                 max_qty,
@@ -188,6 +195,7 @@ class APIService extends BaseModel
                 :category,
                 :type,
                 :api_rate,
+                :markup,
                 :final_price,
                 :min_qty,
                 :max_qty,
@@ -201,8 +209,9 @@ class APIService extends BaseModel
                 category    = VALUES(category),
                 type        = VALUES(type),
                 api_rate    = VALUES(api_rate),
-                -- Keep admin-controlled markup but ensure final_price stays consistent when api_rate changes
-                final_price = ROUND(VALUES(api_rate) * (1 + markup), 4),
+                -- Keep existing admin-controlled markup but recalculate final_price
+                -- Formula: final_price = api_rate + markup (simple addition)
+                final_price = ROUND(VALUES(api_rate) + markup, 4),
                 min_qty     = VALUES(min_qty),
                 max_qty     = VALUES(max_qty),
                 extra       = VALUES(extra),
@@ -216,6 +225,7 @@ class APIService extends BaseModel
             ':category'             => (string)($data['category'] ?? ''),
             ':type'                 => (string)($data['type'] ?? ''),
             ':api_rate'             => $apiRate,
+            ':markup'               => $markup,
             ':final_price'          => $finalPrice,
             ':min_qty'              => $minQty,
             ':max_qty'              => $maxQty,
@@ -228,9 +238,13 @@ class APIService extends BaseModel
     /**
      * Update admin-controlled fields only (single row)
      *
-     * Markup is stored as a fraction:
-     * 0.50 = 50%
-     * final_price = api_rate * (1 + markup)
+     * Pricing formula: final_price = api_rate + markup
+     * 
+     * @param int $id Service ID
+     * @param float $markup Markup amount (absolute value added to api_rate)
+     * @param string $status Service status (active/inactive)
+     * @param string $visible Visibility (yes/no)
+     * @return bool
      */
     public function updateAdminSettings(
         int $id,
@@ -238,7 +252,7 @@ class APIService extends BaseModel
         string $status,
         string $visible
     ): bool {
-        // markup is DECIMAL(10,2) and represents a fraction (e.g., 0.50 = 50%)
+        // markup is DECIMAL(10,2) and represents absolute value to add to api_rate
         $markup = $this->normalizeDecimal($markup, 0.0, 1000.00);
         $markup = round($markup, 2);
 
@@ -246,7 +260,7 @@ class APIService extends BaseModel
             UPDATE api_services
             SET
                 markup = ?,
-                final_price = ROUND(api_rate * (1 + ?), 4),
+                final_price = ROUND(api_rate + ?, 4),
                 status = ?,
                 visible = ?,
                 updated_at = NOW()
@@ -311,7 +325,7 @@ class APIService extends BaseModel
      * Supported bulk operations:
      * - visible: 'yes'|'no'
      * - status: 'active'|'inactive'
-     * - markup: float (fraction; final_price = api_rate * (1 + markup))
+     * - markup: float (absolute value; final_price = api_rate + markup)
      */
     public function bulkUpdateByInstance(
         int $instanceId,
@@ -354,8 +368,8 @@ class APIService extends BaseModel
             $set[] = "markup = ?";
             $params[] = $m;
 
-            // keep final_price consistent
-            $set[] = "final_price = ROUND(api_rate * (1 + ?), 4)";
+            // Final price = api_rate + markup (addition)
+            $set[] = "final_price = ROUND(api_rate + ?, 4)";
             $params[] = $m;
         }
 
@@ -381,6 +395,7 @@ class APIService extends BaseModel
     /**
      * Update api_rate from a pricing map (external_service_id => rate)
      * and keep final_price consistent with stored markup.
+     * Formula: final_price = api_rate + markup
      */
     public function updateRatesFromPricing(int $instanceId, array $rates): int
     {
@@ -419,7 +434,7 @@ class APIService extends BaseModel
                     (CASE external_service_id
                         " . implode(' ', $caseParts) . "
                         ELSE api_rate
-                    END) * (1 + markup),
+                    END) + markup,
                     4
                 ),
                 updated_at = NOW()
@@ -705,5 +720,103 @@ class APIService extends BaseModel
         );
 
         return (int)($row->total ?? 0);
+    }
+
+    /**
+     * Update ONLY the markup for a service and recalculate final_price.
+     * Formula: final_price = api_rate + markup
+     *
+     * @param int $id Service ID
+     * @param float $markup Markup amount to add to api_rate
+     * @return bool
+     */
+    public function updateMarkup(int $id, float $markup): bool
+    {
+        $id = (int)$id;
+        if ($id <= 0) {
+            return false;
+        }
+
+        $markup = $this->normalizeDecimal($markup, 0.0, 1000.00);
+        $markup = round($markup, 2);
+
+        $sql = "
+            UPDATE api_services
+            SET
+                markup = ?,
+                final_price = ROUND(api_rate + ?, 4),
+                updated_at = NOW()
+            WHERE id = ?
+        ";
+
+        $this->query($sql, [$markup, $markup, $id]);
+
+        return true;
+    }
+
+    /**
+     * Bulk update markup for ALL services of a given instance.
+     * Formula: final_price = api_rate + markup
+     *
+     * @param int $instanceId API instance ID
+     * @param float $markup Markup amount to apply to all services
+     * @return int Number of services updated
+     */
+    public function bulkUpdateMarkup(int $instanceId, float $markup): int
+    {
+        $instanceId = (int)$instanceId;
+        if ($instanceId <= 0) {
+            return 0;
+        }
+
+        $markup = $this->normalizeDecimal($markup, 0.0, 1000.00);
+        $markup = round($markup, 2);
+
+        $sql = "
+            UPDATE api_services
+            SET
+                markup = ?,
+                final_price = ROUND(api_rate + ?, 4),
+                updated_at = NOW()
+            WHERE api_instance_id = ?
+        ";
+
+        $stmt = $this->query($sql, [$markup, $markup, $instanceId]);
+
+        return (int)$stmt->rowCount();
+    }
+
+    /**
+     * Apply instance default_markup to all services of an instance.
+     * Called during sync to set initial markup based on instance settings.
+     *
+     * @param int $instanceId API instance ID
+     * @param float $defaultMarkup Default markup value
+     * @return int Number of services updated
+     */
+    public function applyDefaultMarkup(int $instanceId, float $defaultMarkup): int
+    {
+        $instanceId = (int)$instanceId;
+        if ($instanceId <= 0) {
+            return 0;
+        }
+
+        $defaultMarkup = $this->normalizeDecimal($defaultMarkup, 0.0, 1000.00);
+        $defaultMarkup = round($defaultMarkup, 2);
+
+        $sql = "
+            UPDATE api_services
+            SET
+                markup = ?,
+                final_price = ROUND(api_rate + ?, 4),
+                updated_at = NOW()
+            WHERE api_instance_id = ?
+              AND markup < ?
+        ";
+
+        // Only update if markup is lower than default (preserve higher admin-set markups)
+        $stmt = $this->query($sql, [$defaultMarkup, $defaultMarkup, $instanceId, $defaultMarkup]);
+
+        return (int)$stmt->rowCount();
     }
 }
