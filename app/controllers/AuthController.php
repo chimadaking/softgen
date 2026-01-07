@@ -10,6 +10,10 @@ class AuthController extends BaseController {
 
     public function register() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('auth/register');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $data = [
@@ -70,6 +74,10 @@ class AuthController extends BaseController {
 
     public function login() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('auth/login');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $data = [
@@ -170,6 +178,10 @@ class AuthController extends BaseController {
 
     public function forgotPassword() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('auth/forgot-password');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $email = trim($_POST['email']);
@@ -187,11 +199,74 @@ class AuthController extends BaseController {
                 return;
             }
 
-            flash('success', 'Password reset instructions have been sent to your email');
-            redirect('auth/login');
+            $resetModel = $this->model('PasswordReset');
+            $token = $resetModel->createToken($user->id);
+            $resetLink = site_url('auth/reset-password/' . $token);
+
+            flash('success', 'Password reset link generated. Use the link below to continue.');
+            $this->view('auth/forgot-password', ['reset_link' => $resetLink]);
+            return;
         } else {
             $this->view('auth/forgot-password', []);
         }
+    }
+
+    public function resetPassword($token) {
+        $resetModel = $this->model('PasswordReset');
+        $record = $resetModel->findValidToken($token);
+
+        if (!$record) {
+            flash('error', 'Reset link is invalid or expired', 'alert alert-danger');
+            redirect('auth/forgot-password');
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('auth/reset-password/' . $token);
+            }
+
+            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+            $data = [
+                'password' => trim($_POST['password'] ?? ''),
+                'confirm_password' => trim($_POST['confirm_password'] ?? ''),
+                'password_err' => '',
+                'confirm_password_err' => ''
+            ];
+
+            if (empty($data['password'])) {
+                $data['password_err'] = 'Please enter a new password';
+            } elseif (strlen($data['password']) < 6) {
+                $data['password_err'] = 'Password must be at least 6 characters';
+            }
+
+            if ($data['password'] !== $data['confirm_password']) {
+                $data['confirm_password_err'] = 'Passwords do not match';
+            }
+
+            if (empty($data['password_err']) && empty($data['confirm_password_err'])) {
+                if ($this->userModel->updatePasswordById((int)$record->user_id, $data['password'])) {
+                    $resetModel->markUsed((int)$record->id);
+                    flash('success', 'Password reset successful. You can log in now.');
+                    redirect('auth/login');
+                }
+                flash('error', 'Failed to reset password', 'alert alert-danger');
+            }
+
+            $this->view('auth/reset-password', [
+                'token' => $token,
+                'password_err' => $data['password_err'],
+                'confirm_password_err' => $data['confirm_password_err']
+            ]);
+            return;
+        }
+
+        $this->view('auth/reset-password', [
+            'token' => $token,
+            'password_err' => '',
+            'confirm_password_err' => ''
+        ]);
     }
 
     public function referral($code) {

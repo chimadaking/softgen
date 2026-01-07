@@ -17,15 +17,6 @@ ini_set('display_startup_errors', 1);
 // Load bootstrap file
 require_once __DIR__ . '/../bootstrap.php';
 
-// Add this temporary test right after: require_once __DIR__ . '/../bootstrap.php';
-error_log("=== CONSTANTS CHECK ===");
-error_log("BASE_DIR: " . BASE_DIR);
-error_log("APP_URL: " . APP_URL);
-error_log("USE_REWRITE: " . (USE_REWRITE ? 'true' : 'false'));
-error_log("site_url('auth/login'): " . site_url('auth/login'));
-error_log("site_url('dashboard'): " . site_url('dashboard'));
-error_log("=== END CHECK ===");
-
 // Load routes configuration
 $routes = require __DIR__ . '/../routes.php';
 if (!is_array($routes)) {

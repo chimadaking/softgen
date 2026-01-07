@@ -31,7 +31,7 @@ class ReportController extends BaseController {
         $userModel = $this->model('User');
         $data = [
             'title' => 'User Reports',
-            'users' => $userModel->getAllUsers()
+            'users' => $userModel->getAllUsersWithRoles()
         ];
         $this->view('admin/reports/users', $data);
     }

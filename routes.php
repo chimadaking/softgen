@@ -9,6 +9,8 @@ return [
     'auth/login' => ['AuthController', 'login'],
     'auth/register' => ['AuthController', 'register'],
     'auth/logout' => ['AuthController', 'logout'],
+    'auth/forgot-password' => ['AuthController', 'forgotPassword'],
+    'auth/reset-password/{token}' => ['AuthController', 'resetPassword'],
 
     // User Dashboard
     'dashboard' => ['DashboardController', 'index'],
@@ -31,10 +33,12 @@ return [
     'admin/loyalty/settings' => ['AdminController', 'loyaltySettings'],
 
     // Roles / Users (admin)
-    'admin/users' => ['UserController', 'index'],
-    'admin/users/create' => ['UserController', 'create'],
-    'admin/users/edit/{id}' => ['UserController', 'edit'],
-    'admin/users/delete/{id}' => ['UserController', 'delete'],
+    'admin/users' => ['AdminController', 'users'],
+    'admin/users/create' => ['AdminController', 'userCreate'],
+    'admin/users/edit/{id}' => ['AdminController', 'userEdit'],
+    'admin/users/delete/{id}' => ['AdminController', 'userDelete'],
+    'admin/users/status/{id}' => ['AdminController', 'userStatus'],
+    'admin/users/roles/{id}' => ['AdminController', 'userRoles'],
 
     // Providers (admin)
     'admin/providers' => ['ProviderController', 'index'],

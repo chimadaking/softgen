@@ -26,6 +26,10 @@ class WalletController extends BaseController {
 
     public function fund() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('wallet/fund');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
             
             $data = [
@@ -44,21 +48,19 @@ class WalletController extends BaseController {
 
             if (empty($data['amount_err'])) {
                 $amount = floatval($data['amount']);
-                // In a real app, redirect to payment gateway (Binance, PayPal, etc.)
-                // For this demo, we'll simulate a successful payment
-                $this->walletModel->updateBalance($this->userData['id'], $amount, 'credit');
-                $this->walletModel->addTransaction($this->userData['id'], $amount, 'deposit', 'Wallet funding via ' . ucfirst($data['method']));
-                
-                // Award loyalty points for wallet funding
-                $pointsRate = $this->loyaltyModel->getPointsRate('funding');
-                $pointsEarned = $amount * $pointsRate;
-                
-                if ($pointsEarned > 0) {
-                    $this->loyaltyModel->addPoints($this->userData['id'], $pointsEarned, "Wallet funding - $" . number_format($amount, 2));
-                    $this->loyaltyModel->updateTier($this->userData['id']);
+                $created = $this->walletModel->createPendingDeposit(
+                    $this->userData['id'],
+                    $amount,
+                    'Wallet funding request via ' . ucfirst($data['method'])
+                );
+
+                if ($created) {
+                    $data['success'] = 'Funding request submitted and pending review.';
+                } else {
+                    $data['amount_err'] = 'Unable to submit funding request. Please try again.';
+                    $this->view('wallet/fund', $data);
+                    return;
                 }
-                
-                $data['success'] = 'Wallet funded successfully! You earned ' . number_format($pointsEarned, 2) . ' loyalty points.';
                 redirect('wallet');
             }
         } else {
@@ -76,6 +78,10 @@ class WalletController extends BaseController {
 
     public function withdraw() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('wallet/withdraw');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
             
             $data = [
@@ -96,10 +102,19 @@ class WalletController extends BaseController {
 
             if (empty($data['amount_err'])) {
                 $amount = floatval($data['amount']);
-                // In a real app, initiate withdrawal request
-                $this->walletModel->updateBalance($this->userData['id'], $amount, 'debit');
-                $this->walletModel->addTransaction($this->userData['id'], $amount, 'withdrawal', 'Withdrawal via ' . ucfirst($data['method']));
-                $data['success'] = 'Withdrawal request submitted successfully!';
+                $success = $this->walletModel->createPendingWithdrawal(
+                    $this->userData['id'],
+                    $amount,
+                    'Withdrawal request via ' . ucfirst($data['method'])
+                );
+
+                if ($success) {
+                    $data['success'] = 'Withdrawal request submitted and pending review.';
+                } else {
+                    $data['amount_err'] = 'Unable to submit withdrawal request.';
+                    $this->view('wallet/withdraw', $data);
+                    return;
+                }
                 redirect('wallet');
             }
         } else {

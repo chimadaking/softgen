@@ -12,16 +12,34 @@
                 <thead>
                     <tr>
                         <th>Timestamp</th>
-                        <th>API</th>
+                        <th>API Instance</th>
                         <th>Endpoint</th>
+                        <th>Method</th>
                         <th>Status</th>
-                        <th>Response Time</th>
+                        <th>IP Address</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td colspan="5" class="text-center">No logs available</td>
-                    </tr>
+                    <?php if (!empty($data['logs'])): ?>
+                        <?php foreach ($data['logs'] as $log): ?>
+                            <tr>
+                                <td><?php echo date('M d, Y H:i', strtotime($log->created_at)); ?></td>
+                                <td><?php echo h($log->instance_name ?? 'Unknown'); ?></td>
+                                <td><?php echo h($log->endpoint); ?></td>
+                                <td><?php echo h(strtoupper($log->request_method)); ?></td>
+                                <td>
+                                    <span class="badge bg-<?php echo ($log->response_code >= 200 && $log->response_code < 300) ? 'success' : 'danger'; ?>">
+                                        <?php echo h($log->response_code); ?>
+                                    </span>
+                                </td>
+                                <td><?php echo h($log->ip_address); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="6" class="text-center">No logs available</td>
+                        </tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>

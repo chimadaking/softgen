@@ -13,7 +13,12 @@ class AdminController extends BaseController {
     }
 
     public function register() {
+        $this->requireAdmin();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('admin/register');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $data = [
@@ -77,6 +82,10 @@ class AdminController extends BaseController {
     public function login()
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('admin/login');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_SPECIAL_CHARS);
 
             $data = [
@@ -95,16 +104,14 @@ class AdminController extends BaseController {
             }
 
             if (empty($data['email_err']) && empty($data['password_err'])) {
-                $user = $this->userModel->findByEmail($data['email']);
+                $user = $this->userModel->login($data['email'], $data['password']);
 
-                if ($user && password_verify($data['password'], $user->password) && $user->role === 'admin') {
-                    $_SESSION['admin_id'] = $user->id;
-                    $_SESSION['admin_email'] = $user->email;
-
+                if ($user && $this->hasAdminRole($user->roles ?? [])) {
+                    $this->createUserSession($user);
                     redirect('admin');
-                } else {
-                    $data['password_err'] = 'Invalid credentials or not an admin';
                 }
+
+                $data['password_err'] = 'Invalid credentials or not an admin';
             }
 
             $this->view('admin/login', $data);
@@ -116,8 +123,42 @@ class AdminController extends BaseController {
                 'password_err' => ''
             ];
 
-            $this->view('admin/login', $data);
+        $this->view('admin/login', $data);
         }
+    }
+
+    private function createUserSession($user): void
+    {
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = $user->id;
+        $_SESSION['user_email'] = $user->email;
+        $_SESSION['user_name'] = $user->username;
+        $_SESSION['user_roles'] = $this->extractRoleNames($user->roles ?? []);
+        $_SESSION['last_activity'] = time();
+    }
+
+    private function extractRoleNames($roles): array
+    {
+        $roleNames = [];
+        if (is_array($roles)) {
+            foreach ($roles as $role) {
+                $roleNames[] = $role->name;
+            }
+        }
+        return $roleNames;
+    }
+
+    private function hasAdminRole($roles): bool
+    {
+        if (!is_array($roles)) {
+            return false;
+        }
+        foreach ($roles as $role) {
+            if ($role->name === 'admin') {
+                return true;
+            }
+        }
+        return false;
     }
 
     protected function requireAdmin() {
@@ -135,7 +176,7 @@ class AdminController extends BaseController {
         $productModel = $this->model('Product');
         $loyaltyModel = $this->model('Loyalty');
         
-        $users = $userModel->getAllUsers();
+        $users = $userModel->getAllUsersWithRoles();
         $loyaltyStats = $loyaltyModel->getStats();
         
         $data = [
@@ -157,9 +198,251 @@ class AdminController extends BaseController {
         $userModel = $this->model('User');
         $data = [
             'title' => 'Manage Users',
-            'users' => $userModel->getAllUsers()
+            'users' => $userModel->getAllUsersWithRoles()
         ];
         $this->view('admin/users', $data);
+    }
+
+    public function userCreate() {
+        $this->requireAdmin();
+
+        $userModel = $this->model('User');
+        $roles = $userModel->getAllRoles();
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('admin/users/create');
+            }
+
+            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+            $data = [
+                'username' => trim($_POST['username'] ?? ''),
+                'email' => trim($_POST['email'] ?? ''),
+                'password' => trim($_POST['password'] ?? ''),
+                'confirm_password' => trim($_POST['confirm_password'] ?? ''),
+                'first_name' => trim($_POST['first_name'] ?? ''),
+                'last_name' => trim($_POST['last_name'] ?? ''),
+                'status' => $_POST['status'] ?? 'active',
+                'roles' => array_map('intval', $_POST['roles'] ?? []),
+                'username_err' => '',
+                'email_err' => '',
+                'password_err' => '',
+                'confirm_password_err' => ''
+            ];
+
+            if (empty($data['username'])) {
+                $data['username_err'] = 'Please enter username';
+            }
+
+            if (empty($data['email'])) {
+                $data['email_err'] = 'Please enter email';
+            } elseif ($userModel->findByEmail($data['email'])) {
+                $data['email_err'] = 'Email already exists';
+            }
+
+            if (empty($data['password'])) {
+                $data['password_err'] = 'Please enter password';
+            } elseif (strlen($data['password']) < 6) {
+                $data['password_err'] = 'Password must be at least 6 characters';
+            }
+
+            if ($data['password'] !== $data['confirm_password']) {
+                $data['confirm_password_err'] = 'Passwords do not match';
+            }
+
+            if (empty($data['roles'])) {
+                $data['roles'] = [ROLE_USER];
+            }
+
+            if (empty($data['username_err']) && empty($data['email_err']) && empty($data['password_err']) && empty($data['confirm_password_err'])) {
+                if ($userModel->createUserWithRoles($data, $data['roles'])) {
+                    flash('success', 'User created successfully');
+                    redirect('admin/users');
+                }
+                flash('error', 'Failed to create user', 'alert alert-danger');
+            }
+
+            $this->view('admin/user_create', [
+                'title' => 'Create User',
+                'user' => $data,
+                'roles' => $roles
+            ]);
+            return;
+        }
+
+        $this->view('admin/user_create', [
+            'title' => 'Create User',
+            'user' => [
+                'username' => '',
+                'email' => '',
+                'first_name' => '',
+                'last_name' => '',
+                'status' => 'active',
+                'roles' => [ROLE_USER],
+                'username_err' => '',
+                'email_err' => '',
+                'password_err' => '',
+                'confirm_password_err' => ''
+            ],
+            'roles' => $roles
+        ]);
+    }
+
+    public function userEdit($id) {
+        $this->requireAdmin();
+
+        $userModel = $this->model('User');
+        $user = $userModel->findById($id);
+        if (!$user) {
+            flash('error', 'User not found', 'alert alert-danger');
+            redirect('admin/users');
+        }
+
+        $roles = $userModel->getAllRoles();
+        $currentRoles = $userModel->getUserRoleIds($id);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('admin/users/edit/' . $id);
+            }
+
+            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+            $data = [
+                'username' => trim($_POST['username'] ?? ''),
+                'email' => trim($_POST['email'] ?? ''),
+                'password' => trim($_POST['password'] ?? ''),
+                'confirm_password' => trim($_POST['confirm_password'] ?? ''),
+                'first_name' => trim($_POST['first_name'] ?? ''),
+                'last_name' => trim($_POST['last_name'] ?? ''),
+                'status' => $_POST['status'] ?? $user->status,
+                'roles' => array_map('intval', $_POST['roles'] ?? []),
+                'username_err' => '',
+                'email_err' => '',
+                'password_err' => '',
+                'confirm_password_err' => ''
+            ];
+
+            if (empty($data['username'])) {
+                $data['username_err'] = 'Please enter username';
+            }
+
+            if (empty($data['email'])) {
+                $data['email_err'] = 'Please enter email';
+            } elseif ($user->email !== $data['email'] && $userModel->findByEmail($data['email'])) {
+                $data['email_err'] = 'Email already exists';
+            }
+
+            if (!empty($data['password']) && strlen($data['password']) < 6) {
+                $data['password_err'] = 'Password must be at least 6 characters';
+            }
+
+            if (!empty($data['password']) && $data['password'] !== $data['confirm_password']) {
+                $data['confirm_password_err'] = 'Passwords do not match';
+            }
+
+            if (empty($data['roles'])) {
+                $data['roles'] = [ROLE_USER];
+            }
+
+            if (empty($data['username_err']) && empty($data['email_err']) && empty($data['password_err']) && empty($data['confirm_password_err'])) {
+                if ($userModel->updateUser($id, $data) && $userModel->setUserRoles($id, $data['roles'])) {
+                    flash('success', 'User updated successfully');
+                    redirect('admin/users');
+                }
+                flash('error', 'Failed to update user', 'alert alert-danger');
+            }
+
+            $this->view('admin/user_edit', [
+                'title' => 'Edit User',
+                'user' => (object)array_merge((array)$user, $data),
+                'roles' => $roles,
+                'selected_roles' => $data['roles']
+            ]);
+            return;
+        }
+
+        $this->view('admin/user_edit', [
+            'title' => 'Edit User',
+            'user' => $user,
+            'roles' => $roles,
+            'selected_roles' => $currentRoles
+        ]);
+    }
+
+    public function userDelete($id) {
+        $this->requireAdmin();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            redirect('admin/users');
+        }
+
+        if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+            flash('error', 'Invalid CSRF token', 'alert alert-danger');
+            redirect('admin/users');
+        }
+
+        $userModel = $this->model('User');
+        if ($userModel->deleteUser($id)) {
+            flash('success', 'User deleted successfully');
+        } else {
+            flash('error', 'Failed to delete user', 'alert alert-danger');
+        }
+        redirect('admin/users');
+    }
+
+    public function userStatus($id) {
+        $this->requireAdmin();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            redirect('admin/users');
+        }
+
+        if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+            flash('error', 'Invalid CSRF token', 'alert alert-danger');
+            redirect('admin/users');
+        }
+
+        $status = $_POST['status'] ?? 'active';
+        $status = in_array($status, ['active', 'pending', 'suspended'], true) ? $status : 'active';
+
+        $userModel = $this->model('User');
+        if ($userModel->updateStatus($id, $status)) {
+            flash('success', 'User status updated');
+        } else {
+            flash('error', 'Failed to update status', 'alert alert-danger');
+        }
+        redirect('admin/users');
+    }
+
+    public function userRoles($id) {
+        $this->requireAdmin();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            redirect('admin/users/edit/' . $id);
+        }
+
+        if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+            flash('error', 'Invalid CSRF token', 'alert alert-danger');
+            redirect('admin/users/edit/' . $id);
+        }
+
+        $roleIds = array_map('intval', $_POST['roles'] ?? []);
+        if (empty($roleIds)) {
+            $roleIds = [ROLE_USER];
+        }
+
+        $userModel = $this->model('User');
+        if ($userModel->setUserRoles($id, $roleIds)) {
+            flash('success', 'User roles updated');
+        } else {
+            flash('error', 'Failed to update roles', 'alert alert-danger');
+        }
+
+        redirect('admin/users/edit/' . $id);
     }
 
     public function products() {
@@ -233,6 +516,10 @@ class AdminController extends BaseController {
         
         // Handle manual point adjustments
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('admin/loyalty/' . $userId);
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
             
             $action = $_POST['action'];
@@ -272,6 +559,10 @@ class AdminController extends BaseController {
         $loyaltyModel = $this->model('Loyalty');
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('admin/loyalty/settings');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
             
             $settings = [
