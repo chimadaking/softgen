@@ -41,6 +41,10 @@ class APIController extends BaseController
         $this->requireAdmin();
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('api/create');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $data = [
@@ -73,7 +77,8 @@ class APIController extends BaseController
         $this->requireAdmin();
 
         $this->view('admin/api_logs', [
-            'title' => 'API Logs'
+            'title' => 'API Logs',
+            'logs' => $this->instanceModel->getLogs(200)
         ]);
     }
 
@@ -88,6 +93,10 @@ class APIController extends BaseController
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('api/edit/' . $id);
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $data = [
@@ -414,6 +423,11 @@ class APIController extends BaseController
             redirect('api');
         }
 
+        if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+            flash('error', 'Invalid CSRF token', 'alert alert-danger');
+            redirect('api');
+        }
+
         $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
         $id      = (int)($_POST['id'] ?? 0);
@@ -565,15 +579,27 @@ class APIController extends BaseController
         $isJson = stripos($contentType, 'application/json') !== false;
 
         $markup = 0.00;
+        $payload = [];
 
         if ($isJson) {
             // JSON payload
             $rawBody = file_get_contents('php://input');
             $payload = json_decode($rawBody ?: '{}', true);
+            $csrfToken = is_array($payload) ? trim((string)($payload['csrf_token'] ?? '')) : '';
+            if ($csrfToken === '' || !verify_csrf_token($csrfToken)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Invalid CSRF token.']);
+                return;
+            }
             $markup = (float)($payload['markup'] ?? 0.00);
         } else {
             // Form payload
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Invalid CSRF token.']);
+                return;
+            }
             $markup = (float)($_POST['markup'] ?? 0.00);
         }
 

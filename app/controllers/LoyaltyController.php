@@ -59,6 +59,10 @@ class LoyaltyController extends BaseController {
     
     public function redeem() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('loyalty/redeem');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
             
             $pointsToRedeem = floatval($_POST['points']);
@@ -83,7 +87,7 @@ class LoyaltyController extends BaseController {
             // Add credit to wallet
             $walletModel = $this->model('Wallet');
             $walletModel->updateBalance($this->userData['id'], $walletCredit, 'credit');
-            $walletModel->addTransaction($this->userData['id'], $walletCredit, 'credit', 'Loyalty points redemption');
+            $walletModel->addTransaction($this->userData['id'], $walletCredit, 'deposit', 'Loyalty points redemption');
             
             flash('success', "Successfully redeemed {$pointsToRedeem} points for $" . number_format($walletCredit, 2) . " wallet credit!");
             redirect('wallet');

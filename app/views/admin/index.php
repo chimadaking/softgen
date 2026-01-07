@@ -150,7 +150,13 @@
                                     <br>
                                     <small class="text-muted"><?php echo h($user->email); ?></small>
                                 </div>
-                                <span class="badge bg-primary"><?php echo ucfirst($user->role); ?></span>
+                                <?php
+                                    $roles = array_filter(array_map('trim', explode(',', $user->role_names ?? '')));
+                                    if (empty($roles)) {
+                                        $roles = ['user'];
+                                    }
+                                ?>
+                                <span class="badge bg-primary"><?php echo h(ucfirst($roles[0])); ?></span>
                             </li>
                         <?php endforeach; ?>
                     </ul>

@@ -12,7 +12,7 @@
                 <h5 class="mb-0">Fund Your Wallet</h5>
             </div>
             <div class="card-body">
-                <p class="text-muted mb-4">Enter the amount you want to add to your wallet.</p>
+                <p class="text-muted mb-4">Enter the amount you want to add to your wallet. Funding requests are reviewed and approved manually.</p>
                 
                 <?php if (isset($data['success'])): ?>
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -86,8 +86,8 @@
             </div>
             <div class="card-body">
                 <ul class="list-unstyled mb-0">
-                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i> Instant processing</li>
-                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i> Secure transactions</li>
+                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i> Manual approval required</li>
+                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i> Secure transactions once approved</li>
                     <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i> No hidden fees</li>
                     <li class="mb-2"><i class="bi bi-info-circle text-primary me-2"></i> Minimum deposit: $1.00</li>
                     <li><i class="bi bi-info-circle text-primary me-2"></i> Maximum deposit: $10,000.00</li>

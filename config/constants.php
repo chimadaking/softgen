@@ -8,7 +8,11 @@
 | URL path where the app lives (NO trailing slash)
 | Example: /softgenix/public
 */
-define('BASE_DIR', rtrim('/softgenix/public', '/'));
+$baseDir = getenv('BASE_DIR');
+if ($baseDir === false || $baseDir === '') {
+    $baseDir = '/softgenix/public';
+}
+define('BASE_DIR', rtrim($baseDir, '/'));
 
 /*
 |--------------------------------------------------------------------------
@@ -24,7 +28,11 @@ define('BASE_PATH', dirname(__DIR__));
 |--------------------------------------------------------------------------
 | Full base URL to the application
 */
-define('APP_URL', 'http://localhost' . BASE_DIR);
+$appUrl = getenv('APP_URL');
+if ($appUrl === false || $appUrl === '') {
+    $appUrl = 'http://localhost' . BASE_DIR;
+}
+define('APP_URL', $appUrl);
 
 /*
 |--------------------------------------------------------------------------
@@ -33,7 +41,8 @@ define('APP_URL', 'http://localhost' . BASE_DIR);
 | Set to true if Apache mod_rewrite/.htaccess is working
 | Set to false to fallback to index.php?url=... format
 */
-define('USE_REWRITE', false);
+$useRewriteEnv = getenv('USE_REWRITE');
+define('USE_REWRITE', $useRewriteEnv === false ? false : filter_var($useRewriteEnv, FILTER_VALIDATE_BOOLEAN));
 
 /*
 |--------------------------------------------------------------------------

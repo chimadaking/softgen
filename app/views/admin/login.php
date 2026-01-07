@@ -11,6 +11,7 @@
                     <?php flash('error', '', 'alert alert-danger'); ?>
 
                     <form method="POST" action="<?php echo site_url('admin/login'); ?>">
+                        <?php echo csrf_field(); ?>
 
                         <div class="mb-3">
                             <label for="email" class="form-label">Email</label>

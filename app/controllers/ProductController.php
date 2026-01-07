@@ -74,6 +74,10 @@ class ProductController extends BaseController {
 
     public function create() {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('product/create');
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $data = [
@@ -139,6 +143,10 @@ class ProductController extends BaseController {
         }
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('product/edit/' . $id);
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
             $data = [

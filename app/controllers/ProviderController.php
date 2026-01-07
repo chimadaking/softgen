@@ -47,6 +47,10 @@ class ProviderController extends BaseController {
         $this->requireAdmin();
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('admin/providers/create');
+            }
             // IMPORTANT: do NOT sanitize the JSON schema with FULL_SPECIAL_CHARS
             $rawSchema = $_POST['service_schema'] ?? null;
 
@@ -120,6 +124,10 @@ class ProviderController extends BaseController {
         }
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('admin/providers/edit/' . $id);
+            }
             $rawSchema = $_POST['service_schema'] ?? null;
 
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
