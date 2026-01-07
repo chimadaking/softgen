@@ -5,6 +5,7 @@ class OrderController extends BaseController {
     private $orderModel;
     private $productModel;
     private $walletModel;
+    private $loyaltyModel;
     private $userData;
 
     public function __construct() {
@@ -15,6 +16,7 @@ class OrderController extends BaseController {
         $this->orderModel = $this->model('Order');
         $this->productModel = $this->model('Product');
         $this->walletModel = $this->model('Wallet');
+        $this->loyaltyModel = $this->model('Loyalty');
     }
 
     public function index() {
@@ -82,7 +84,25 @@ class OrderController extends BaseController {
                 if ($orderId) {
                     $this->walletModel->updateBalance($this->userData['id'], $totalAmount, 'debit');
                     $this->walletModel->addTransaction($this->userData['id'], $totalAmount, 'purchase', 'Order #' . $orderId);
-                    flash('success', 'Order placed successfully!');
+                    
+                    // Award loyalty points for purchase
+                    $pointsRate = $this->loyaltyModel->getPointsRate('purchase');
+                    $basePoints = $totalAmount * $pointsRate;
+                    
+                    // Add tier bonus
+                    $bonusPoints = $this->loyaltyModel->calculateTierBonus($this->userData['id'], $basePoints);
+                    $totalPointsEarned = $basePoints + $bonusPoints;
+                    
+                    if ($totalPointsEarned > 0) {
+                        $reason = "Purchase - Order #$orderId";
+                        if ($bonusPoints > 0) {
+                            $reason .= " (includes {$bonusPoints} tier bonus)";
+                        }
+                        $this->loyaltyModel->addPoints($this->userData['id'], $totalPointsEarned, $reason, $orderId);
+                        $this->loyaltyModel->updateTier($this->userData['id']);
+                    }
+                    
+                    flash('success', 'Order placed successfully! You earned ' . number_format($totalPointsEarned, 2) . ' loyalty points.');
                     redirect('order');
                 }
             }
@@ -128,7 +148,24 @@ class OrderController extends BaseController {
                     $this->walletModel->updateBalance($this->userData['id'], $totalAmount, 'debit');
                     $this->walletModel->addTransaction($this->userData['id'], $totalAmount, 'purchase', "Order #$orderId");
                     
-                    flash('order_success', 'Order placed successfully!');
+                    // Award loyalty points for purchase
+                    $pointsRate = $this->loyaltyModel->getPointsRate('purchase');
+                    $basePoints = $totalAmount * $pointsRate;
+                    
+                    // Add tier bonus
+                    $bonusPoints = $this->loyaltyModel->calculateTierBonus($this->userData['id'], $basePoints);
+                    $totalPointsEarned = $basePoints + $bonusPoints;
+                    
+                    if ($totalPointsEarned > 0) {
+                        $reason = "Purchase - Order #$orderId";
+                        if ($bonusPoints > 0) {
+                            $reason .= " (includes {$bonusPoints} tier bonus)";
+                        }
+                        $this->loyaltyModel->addPoints($this->userData['id'], $totalPointsEarned, $reason, $orderId);
+                        $this->loyaltyModel->updateTier($this->userData['id']);
+                    }
+                    
+                    flash('order_success', 'Order placed successfully! You earned ' . number_format($totalPointsEarned, 2) . ' loyalty points.');
                     redirect('order/index');
                 }
             } else {

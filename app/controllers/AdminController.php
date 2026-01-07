@@ -133,8 +133,11 @@ class AdminController extends BaseController {
         $userModel = $this->model('User');
         $orderModel = $this->model('Order');
         $productModel = $this->model('Product');
+        $loyaltyModel = $this->model('Loyalty');
         
         $users = $userModel->getAllUsers();
+        $loyaltyStats = $loyaltyModel->getStats();
+        
         $data = [
             'title' => 'Admin Dashboard',
             'total_users' => count($users),
@@ -142,7 +145,8 @@ class AdminController extends BaseController {
             'total_orders' => count($orderModel->getRecentOrdersAdmin(1000)),
             'total_products' => count($productModel->getAllProductsAdmin()),
             'recent_orders' => $orderModel->getRecentOrdersAdmin(5),
-            'recent_users' => array_slice($users, 0, 5)
+            'recent_users' => array_slice($users, 0, 5),
+            'loyalty_stats' => $loyaltyStats
         ];
         $this->view('admin/index', $data);
     }
@@ -187,5 +191,108 @@ class AdminController extends BaseController {
             'title' => 'Reports'
         ];
         $this->view('admin/reports', $data);
+    }
+    
+    public function loyalty() {
+        $this->requireAdmin();
+        
+        $loyaltyModel = $this->model('Loyalty');
+        
+        $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+        
+        $users = $loyaltyModel->getAllUsersWithLoyalty($limit, $offset);
+        $totalUsers = count($loyaltyModel->getAllUsersWithLoyalty(10000, 0));
+        $totalPages = ceil($totalUsers / $limit);
+        
+        $data = [
+            'title' => 'Loyalty Program',
+            'users' => $users,
+            'page' => $page,
+            'total_pages' => $totalPages,
+            'total_users' => $totalUsers
+        ];
+        $this->view('admin/loyalty', $data);
+    }
+    
+    public function loyaltyDetail($userId) {
+        $this->requireAdmin();
+        
+        $loyaltyModel = $this->model('Loyalty');
+        
+        $user = $loyaltyModel->getUserLoyaltyById($userId);
+        if (!$user) {
+            flash('error', 'User not found');
+            redirect('admin/loyalty');
+        }
+        
+        $history = $loyaltyModel->getPointsHistory($userId, 100, 0);
+        $totalEarned = $loyaltyModel->getTotalPointsEarned($userId);
+        $totalRedeemed = $loyaltyModel->getTotalPointsRedeemed($userId);
+        
+        // Handle manual point adjustments
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+            
+            $action = $_POST['action'];
+            $points = floatval($_POST['points']);
+            $reason = trim($_POST['reason']);
+            
+            if ($points > 0 && !empty($reason)) {
+                if ($action == 'add') {
+                    $loyaltyModel->addPoints($userId, $points, $reason);
+                    flash('success', "Successfully added {$points} points to user");
+                } elseif ($action == 'subtract') {
+                    if ($loyaltyModel->subtractPoints($userId, $points, $reason)) {
+                        flash('success', "Successfully deducted {$points} points from user");
+                    } else {
+                        flash('error', 'Insufficient points');
+                    }
+                }
+                redirect('admin/loyalty/' . $userId);
+            } else {
+                flash('error', 'Invalid input');
+            }
+        }
+        
+        $data = [
+            'title' => 'Loyalty Details - ' . $user->username,
+            'user' => $user,
+            'history' => $history,
+            'total_earned' => $totalEarned,
+            'total_redeemed' => $totalRedeemed
+        ];
+        $this->view('admin/loyalty_detail', $data);
+    }
+    
+    public function loyaltySettings() {
+        $this->requireAdmin();
+        
+        $loyaltyModel = $this->model('Loyalty');
+        
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+            
+            $settings = [
+                'points_per_dollar_purchase' => floatval($_POST['points_per_dollar_purchase']),
+                'points_per_dollar_funding' => floatval($_POST['points_per_dollar_funding']),
+                'loyalty_tier_bronze' => intval($_POST['loyalty_tier_bronze']),
+                'loyalty_tier_silver' => intval($_POST['loyalty_tier_silver']),
+                'loyalty_tier_gold' => intval($_POST['loyalty_tier_gold']),
+                'loyalty_tier_platinum' => intval($_POST['loyalty_tier_platinum'])
+            ];
+            
+            $loyaltyModel->updateSettings($settings);
+            flash('success', 'Loyalty settings updated successfully!');
+        }
+        
+        $settings = $loyaltyModel->getAllSettings();
+        
+        $data = [
+            'title' => 'Loyalty Settings',
+            'settings' => $settings
+        ];
+        $this->view('admin/loyalty_settings', $data);
     }
 }

@@ -42,6 +42,62 @@
     </div>
 </div>
 
+<!-- Loyalty Stats Section -->
+<?php if (isset($data['loyalty_stats'])): ?>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Loyalty Program Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h6 class="text-muted">Total Members</h6>
+                                <h3><?php echo $data['loyalty_stats']['total_members']; ?></h3>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h6 class="text-muted">Average Points per User</h6>
+                                <h3><?php echo number_format($data['loyalty_stats']['average_points'], 2); ?></h3>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h6 class="text-muted">Points Issued This Month</h6>
+                                <h3><?php echo number_format($data['loyalty_stats']['points_issued_month'], 0); ?></h3>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h6 class="text-muted">Manage</h6>
+                                <a href="<?php echo site_url('admin/loyalty'); ?>" class="btn btn-primary">Loyalty Program</a>
+                            </div>
+                        </div>
+                    </div>
+                    <?php if (!empty($data['loyalty_stats']['tier_breakdown'])): ?>
+                        <hr>
+                        <h6>Tier Breakdown</h6>
+                        <div class="row">
+                            <?php foreach ($data['loyalty_stats']['tier_breakdown'] as $tier): ?>
+                                <div class="col-md-3 text-center">
+                                    <div class="border rounded p-3">
+                                        <strong><?php echo $tier->name; ?></strong>
+                                        <h4><?php echo $tier->count; ?></h4>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="row mb-4">
     <div class="col-md-6">
         <div class="card shadow-sm">
