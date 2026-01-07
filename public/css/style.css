@@ -12,6 +12,32 @@ body {
     flex-direction: column;
 }
 
+.app-body {
+    padding-top: 72px;
+}
+
+.app-navbar {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1030;
+}
+
+@media (min-width: 768px) {
+    .app-sidebar {
+        position: fixed;
+        top: 72px;
+        bottom: 0;
+        width: 25%;
+        overflow-y: auto;
+        padding-bottom: 1rem;
+    }
+
+    .app-content {
+        margin-left: 25%;
+    }
+}
+
 .footer {
     margin-top: auto;
 }

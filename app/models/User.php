@@ -116,6 +116,103 @@ class User extends BaseModel {
         return $this->fetchAll("SELECT DISTINCT u.* FROM users u");
     }
 
+    public function getAllUsersWithRoles(): array {
+        return $this->fetchAll(
+            "SELECT u.*,
+                    GROUP_CONCAT(r.name ORDER BY r.name SEPARATOR ',') AS role_names
+             FROM users u
+             LEFT JOIN user_roles ur ON ur.user_id = u.id
+             LEFT JOIN roles r ON r.id = ur.role_id
+             GROUP BY u.id
+             ORDER BY u.created_at DESC"
+        );
+    }
+
+    public function getAllRoles(): array {
+        return $this->fetchAll("SELECT id, name FROM roles ORDER BY name ASC");
+    }
+
+    public function getUserRoleIds(int $userId): array {
+        $rows = $this->fetchAll("SELECT role_id FROM user_roles WHERE user_id = ?", [$userId]);
+        return array_map(static fn($row) => (int)$row->role_id, $rows);
+    }
+
+    public function setUserRoles(int $userId, array $roleIds): bool {
+        $this->db->beginTransaction();
+        try {
+            $this->query("DELETE FROM user_roles WHERE user_id = ?", [$userId]);
+            foreach ($roleIds as $roleId) {
+                $this->query("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", [$userId, $roleId]);
+            }
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            return false;
+        }
+    }
+
+    public function createUserWithRoles(array $data, array $roleIds): bool {
+        $this->db->beginTransaction();
+        try {
+            $sql = "INSERT INTO users (username, email, password, first_name, last_name, status)
+                    VALUES (:username, :email, :password, :first_name, :last_name, :status)";
+            $this->query($sql, [
+                ':username' => $data['username'],
+                ':email' => $data['email'],
+                ':password' => password_hash($data['password'], PASSWORD_BCRYPT),
+                ':first_name' => $data['first_name'],
+                ':last_name' => $data['last_name'],
+                ':status' => $data['status'] ?? 'active'
+            ]);
+
+            $userId = (int)$this->lastInsertId();
+
+            foreach ($roleIds as $roleId) {
+                $this->query("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", [$userId, $roleId]);
+            }
+
+            $this->query("INSERT INTO wallet_balances (user_id, balance) VALUES (?, 0)", [$userId]);
+            $this->query("INSERT INTO loyalty_accounts (user_id) VALUES (?)", [$userId]);
+
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            return false;
+        }
+    }
+
+    public function updateUser(int $userId, array $data): bool {
+        $fields = [
+            'username' => $data['username'],
+            'email' => $data['email'],
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
+            'status' => $data['status']
+        ];
+
+        if (!empty($data['password'])) {
+            $fields['password'] = password_hash($data['password'], PASSWORD_BCRYPT);
+        }
+
+        $setParts = [];
+        $params = [];
+        foreach ($fields as $key => $value) {
+            $setParts[] = "{$key} = ?";
+            $params[] = $value;
+        }
+        $params[] = $userId;
+
+        $sql = "UPDATE users SET " . implode(', ', $setParts) . " WHERE id = ?";
+        return $this->query($sql, $params) !== false;
+    }
+
+    public function updatePasswordById(int $userId, string $password): bool {
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+        return $this->query("UPDATE users SET password = ? WHERE id = ?", [$hash, $userId]) !== false;
+    }
+
     public function updateProfile($userId, $data) {
         $sql = "UPDATE users SET first_name = :first_name, last_name = :last_name WHERE id = :id";
         $params = [

@@ -2,6 +2,8 @@
 <div class="row">
     <div class="col-md-6 mx-auto">
         <div class="card card-body bg-light mt-5 shadow-sm">
+            <?php flash('success'); ?>
+            <?php flash('error', '', 'alert alert-danger'); ?>
             <h2 class="text-center">Forgot Password</h2>
             <p class="text-center">Enter your email address and we'll send you a link to reset your password.</p>
             <form action="<?php echo BASE_DIR; ?>/auth/forgot-password" method="post">
@@ -17,6 +19,12 @@
                     <a href="<?php echo site_url('auth/login'); ?>" class="text-decoration-none">Back to Login</a>
                 </div>
             </form>
+            <?php if (!empty($data['reset_link'])): ?>
+                <div class="alert alert-info mt-3">
+                    <strong>Reset link:</strong>
+                    <a href="<?php echo h($data['reset_link']); ?>"><?php echo h($data['reset_link']); ?></a>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>

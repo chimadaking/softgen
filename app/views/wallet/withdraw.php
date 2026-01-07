@@ -12,7 +12,7 @@
                 <h5 class="mb-0">Withdraw Funds</h5>
             </div>
             <div class="card-body">
-                <p class="text-muted mb-4">Enter the amount you want to withdraw from your wallet.</p>
+                <p class="text-muted mb-4">Enter the amount you want to withdraw from your wallet. Withdrawal requests are reviewed before processing.</p>
                 
                 <?php if (isset($data['success'])): ?>
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -75,7 +75,7 @@
             </div>
             <div class="card-body">
                 <ul class="list-unstyled mb-0">
-                    <li class="mb-2"><i class="bi bi-clock text-warning me-2"></i> Processing time: 1-3 business days</li>
+                    <li class="mb-2"><i class="bi bi-clock text-warning me-2"></i> Processing time: pending review</li>
                     <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i> Secure transactions</li>
                     <li class="mb-2"><i class="bi bi-info-circle text-primary me-2"></i> Minimum withdrawal: $10.00</li>
                     <li><i class="bi bi-exclamation-circle text-danger me-2"></i> Bank transfer fees may apply</li>
