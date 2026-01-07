@@ -48,11 +48,23 @@
                 <tbody>
                     <?php if (!empty($data['users'])): ?>
                         <?php foreach ($data['users'] as $user): ?>
+                            <?php
+                                $roles = array_filter(array_map('trim', explode(',', $user->role_names ?? '')));
+                                if (empty($roles)) {
+                                    $roles = ['user'];
+                                }
+                            ?>
                             <tr>
                                 <td><?php echo $user->id; ?></td>
                                 <td><?php echo h($user->username); ?></td>
                                 <td><?php echo h($user->email); ?></td>
-                                <td><span class="badge bg-<?php echo ($user->role == 'admin') ? 'danger' : 'primary'; ?>"><?php echo ucfirst($user->role); ?></span></td>
+                                <td>
+                                    <?php foreach ($roles as $role): ?>
+                                        <span class="badge bg-<?php echo ($role === 'admin') ? 'danger' : 'primary'; ?>">
+                                            <?php echo h(ucfirst($role)); ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </td>
                                 <td><span class="badge bg-<?php echo ($user->status == 'active') ? 'success' : 'secondary'; ?>"><?php echo ucfirst($user->status); ?></span></td>
                                 <td><?php echo date('M d, Y', strtotime($user->created_at)); ?></td>
                             </tr>

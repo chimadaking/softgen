@@ -67,6 +67,7 @@
                 </div>
                 
                 <form action="<?php echo BASE_DIR; ?>/order/checkout/<?php echo $data['product']->id; ?>" method="post">
+                    <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
                     <input type="hidden" name="quantity" value="<?php echo $_GET['quantity'] ?? 1; ?>">
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary btn-lg">Place Order</button>

@@ -51,6 +51,10 @@ class OrderController extends BaseController {
         }
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('order/create/' . $productId);
+            }
             $_POST = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
             
             $data = [
@@ -75,16 +79,13 @@ class OrderController extends BaseController {
                     redirect('wallet/fund');
                 }
 
-                $orderId = $this->orderModel->createOrder($this->userData['id'], $totalAmount, [[
+                $orderId = $this->orderModel->createOrderWithWalletDebit($this->userData['id'], $totalAmount, [[
                     'product_id' => $productId,
                     'quantity' => $quantity,
                     'price' => $product->price
                 ]]);
 
                 if ($orderId) {
-                    $this->walletModel->updateBalance($this->userData['id'], $totalAmount, 'debit');
-                    $this->walletModel->addTransaction($this->userData['id'], $totalAmount, 'purchase', 'Order #' . $orderId);
-                    
                     // Award loyalty points for purchase
                     $pointsRate = $this->loyaltyModel->getPointsRate('purchase');
                     $basePoints = $totalAmount * $pointsRate;
@@ -105,6 +106,8 @@ class OrderController extends BaseController {
                     flash('success', 'Order placed successfully! You earned ' . number_format($totalPointsEarned, 2) . ' loyalty points.');
                     redirect('order');
                 }
+
+                flash('error', 'Unable to place order. Please check your wallet balance and try again.');
             }
         } else {
             $data = [
@@ -120,6 +123,15 @@ class OrderController extends BaseController {
     }
 
     public function cancel($id) {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            redirect('order/details/' . $id);
+        }
+
+        if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+            flash('error', 'Invalid CSRF token', 'alert alert-danger');
+            redirect('order/details/' . $id);
+        }
+
         $order = $this->orderModel->getOrderById($id);
         if ($order && $order->user_id == $this->userData['id'] && in_array($order->status, ['pending', 'processing'])) {
             if ($this->orderModel->updateStatus($id, 'cancelled')) {
@@ -136,18 +148,19 @@ class OrderController extends BaseController {
         if (!$product) redirect('product');
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (empty($_POST['csrf_token']) || !verify_csrf_token($_POST['csrf_token'])) {
+                flash('error', 'Invalid CSRF token', 'alert alert-danger');
+                redirect('order/checkout/' . $productId);
+            }
             $quantity = intval($_POST['quantity']);
             $totalAmount = $product->price * $quantity;
             $userBalance = $this->walletModel->getBalance($this->userData['id']);
 
             if ($userBalance >= $totalAmount) {
                 $items = [['product_id' => $productId, 'quantity' => $quantity, 'price' => $product->price]];
-                $orderId = $this->orderModel->createOrder($this->userData['id'], $totalAmount, $items);
+                $orderId = $this->orderModel->createOrderWithWalletDebit($this->userData['id'], $totalAmount, $items);
                 
                 if ($orderId) {
-                    $this->walletModel->updateBalance($this->userData['id'], $totalAmount, 'debit');
-                    $this->walletModel->addTransaction($this->userData['id'], $totalAmount, 'purchase', "Order #$orderId");
-                    
                     // Award loyalty points for purchase
                     $pointsRate = $this->loyaltyModel->getPointsRate('purchase');
                     $basePoints = $totalAmount * $pointsRate;
@@ -168,6 +181,7 @@ class OrderController extends BaseController {
                     flash('order_success', 'Order placed successfully! You earned ' . number_format($totalPointsEarned, 2) . ' loyalty points.');
                     redirect('order/index');
                 }
+                flash('order_error', 'Unable to place order. Please check your wallet balance.', 'alert alert-danger');
             } else {
                 flash('order_error', 'Insufficient balance!', 'alert alert-danger');
             }
