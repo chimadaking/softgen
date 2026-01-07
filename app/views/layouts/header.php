@@ -9,14 +9,14 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?php echo BASE_DIR; ?>/css/style.css">
 </head>
-<body class="bg-light">
+<body class="bg-light app-body">
 
 <?php
 $usdNgnRate = number_format(getUsdToNgnRate(), 2);
 ?>
 
 <?php if (isLoggedIn()): ?>
-<nav class="navbar navbar-expand-md navbar-dark bg-primary mb-4">
+<nav class="navbar navbar-expand-md navbar-dark bg-primary mb-4 app-navbar">
     <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center gap-2" href="<?php echo site_url(''); ?>">
             <?php echo SITE_NAME; ?>
@@ -97,13 +97,13 @@ $usdNgnRate = number_format(getUsdToNgnRate(), 2);
 
 <div class="container-fluid">
     <div class="row">
-        <div class="col-md-3 d-none d-md-block">
+        <div class="col-md-3 d-none d-md-block app-sidebar">
             <?php require_once BASE_PATH . '/app/views/layouts/sidebar.php'; ?>
         </div>
-        <div class="col-md-9">
+        <div class="col-md-9 app-content">
 
 <?php else: ?>
-<nav class="navbar navbar-expand-md navbar-dark bg-primary mb-4">
+<nav class="navbar navbar-expand-md navbar-dark bg-primary mb-4 app-navbar">
     <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center gap-2" href="<?php echo site_url(''); ?>">
             <?php echo SITE_NAME; ?>
